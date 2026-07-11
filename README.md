@@ -64,7 +64,7 @@ flowchart TD
 
 **Stack.** React/Vite · Express · Prisma · PostgreSQL · pyHanko · Cloudflare Tunnel · PrintNode · SVG/STL
 
-**Outcome.** 3,800+ certificates auto-generated and ~450 hours of manual document work eliminated — one source of truth across two systems; manual certificate, printing, and engraving steps replaced by an automated order-to-manufacturing pipeline.
+**Outcome.** One source of truth across two systems; manual certificate, printing, and engraving steps replaced by an automated order-to-manufacturing pipeline. To date the pipeline has produced **3,144 certificates — roughly 260 hours of manual production eliminated** at ~5 minutes each.
 
 ---
 
