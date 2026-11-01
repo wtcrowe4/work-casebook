@@ -2,7 +2,7 @@
 
 Sanitized write-ups of production work I own as **Full-Stack Developer & Technical Operations Lead** at [CalibrationWands.com](https://calibrationwands.com) (a division of Fastec Services LLC). Architecture and outcomes only — no proprietary source, credentials, or internal infrastructure detail.
 
-> **Context.** CalibrationWands.com is a B2B e-commerce manufacturer of NIST-traceable calibration test standards, serving food, pharmaceutical, and textile quality-control customers. I'm responsible for the entire technical stack: storefront, infrastructure, data, ERP, and AI automation.
+> **Context.** CalibrationWands.com is a B2B e-commerce manufacturer of NIST-traceable calibration test standards, serving food, pharmaceutical, and textile quality-control customers. I build and operate its technical stack: storefront, infrastructure, internal platform, business-system integrations, and AI automation.
 
 ---
 
@@ -16,7 +16,7 @@ Sanitized write-ups of production work I own as **Full-Stack Developer & Technic
 flowchart TD
     I[Business events: orders, POs, documents] --> O[Agent orchestration — LangGraph + custom Python]
     O --> A1[Order processing]
-    O --> A2[PO → ERP SKU mapping]
+    O --> A2[PO → catalog SKU mapping]
     O --> A3[Document handling]
     O --> A4[CNC G-code generation]
     O --> S[Self-hosted serving — vLLM + Ollama]
@@ -56,7 +56,7 @@ flowchart TD
 ```
 
 - New orders trigger the platform through a **webhook over a Cloudflare Tunnel** — no exposed origin
-- Auto-generates calibration certificates with **tamper-evident pyHanko cryptographic signing**
+- Auto-generates calibration certificates (Word-template merge via Adobe PDF Services), AES-256 locks them, and signs them with **pyHanko** for tamper-evident verification
 - Embeds a measurement-capture module: per-unit micrometer readings against NIST-traceable references, bringing the workflow into conformance with ISO 10012
 - Tracks serialized test numbers for every standard sold, backed by a relational database
 - Generates SVG engraving and STL files sent to the CNC machine — a software-to-machine production pipeline
@@ -64,7 +64,7 @@ flowchart TD
 
 **Stack.** React/Vite · Express · Prisma · PostgreSQL · pyHanko · Cloudflare Tunnel · PrintNode · SVG/STL
 
-**Outcome.** One source of truth across two systems; manual certificate, printing, and engraving steps replaced by an automated order-to-manufacturing pipeline. To date the pipeline has produced **3,144 certificates — roughly 260 hours of manual production eliminated** at ~5 minutes each.
+**Outcome.** 3,800+ certificates auto-generated and ~450 hours of manual document work eliminated — one source of truth across two systems; manual certificate, printing, and engraving steps replaced by an automated order-to-manufacturing pipeline.
 
 ---
 
@@ -96,28 +96,63 @@ flowchart LR
 
 ---
 
-## 4. ERPNext deployment + QuickBooks ETL
+## 4. Accounting & inventory integration + AI order intake
 
-**Problem.** Business records lived in QuickBooks Desktop with no modern ERP. A company-wide rollout needed a clean schema and migrated data.
+**Problem.** Orders, invoices, and stock lived in separate systems. Every web order and emailed purchase order had to be re-keyed into accounting by hand, and inventory was only reconciled after the fact.
 
-**Approach.** Built and deployed ERPNext v16 (Docker) ahead of the company rollout. Designed a company-wide SKU schema and wrote Python ETL to convert QuickBooks exports into ERPNext over its REST API.
+**Approach.** Connected the order platform to the accounting and inventory systems, and put an LLM intake pipeline in front of the inbox — with a human approving anything before it posts.
 
 ```mermaid
 flowchart LR
-    A[QuickBooks Desktop exports] --> B[Python ETL · custom SKU schema]
-    B --> C[ERPNext v16 REST API]
-    C --> D[(ERPNext — Docker)]
+    E[Emailed POs + quote requests] --> AI[LLM intake: extract, match part numbers, dedupe]
+    AI --> HA{Human approval}
+    W[Web orders] --> H[Order platform]
+    HA --> H
+    H -->|qbXML via Web Connector| Q[QuickBooks Desktop: invoices, estimates, items, customers]
+    H -->|on certificate generation| Z[Zoho Inventory: stock + build planning]
+    H --> L[(Audit change log with revert)]
 ```
 
-- 4,720 products + 2,852 customers imported via API scripts under a custom company-wide SKU schema
+- **QuickBooks Desktop** integration over Web Connector / qbXML: invoices, estimates, items, customers, and inventory adjustments, with per-write verification and an audit change log that can revert a write
+- Built behind a **provider-agnostic accounting interface**, so a future move off QuickBooks Desktop swaps an adapter instead of rewriting the platform
+- **Zoho Inventory** decremented and builds planned automatically as certificates are generated, so stock tracks production in real time
+- **AI order intake:** an LLM pipeline turns emailed purchase orders and quote requests into validated orders: customer part-number matching, duplicate-invoice detection, prompt-injection guards, and a **human approval step** before anything reaches accounting
 
-**Stack.** ERPNext · Docker · Python · REST APIs · QuickBooks
+**Stack.** Node/Express · PostgreSQL · QuickBooks Desktop (qbXML) · Zoho Inventory API · LLM pipeline (self-hosted + guarded prompts)
 
-**Outcome.** Deployment and data migration built and validated **ahead of company rollout**.
+**Outcome.** Orders flow from inbox or storefront into accounting and inventory without re-keying; every automated write is verified, logged, and reversible.
 
 ---
 
-## 5. Custom storefront engineering & data integrity
+## 5. Platform engineering: CI/CD & observability
+
+**Problem.** A growing set of internal services needed safe, repeatable releases and fast visibility when something broke, without a dedicated ops team.
+
+**Approach.** Built a delivery pipeline and observability layer around the internal platform.
+
+```mermaid
+flowchart LR
+    G[Merge request] --> CI[GitLab CI on Docker runners]
+    CI --> T[Tests + gitleaks secret scan + LLM-assisted review]
+    T --> D[Release-swap deploy, zero restart]
+    D --> HC{Post-deploy health check + schema-drift check}
+    HC -->|fail| RB[Keep previous release]
+    HC -->|pass| P[Live]
+    P --> S[Sentry/Bugsink error tracking] --> A[Alerts to Slack]
+```
+
+- **GitLab CI** on Docker runners; every merge runs tests, **gitleaks** secret scanning, and an LLM-assisted code review
+- **Zero-restart release-swap deploys** with post-deploy health checks and schema-drift detection
+- **Sentry/Bugsink** error tracking with alert routing to Slack
+- Internal tools published behind **Cloudflare Tunnel + Access** on an Oracle Cloud ARM host: no open inbound ports
+
+**Stack.** GitLab CI · Docker · Sentry/Bugsink · Cloudflare Tunnel + Access · Oracle Cloud · Linux/systemd
+
+**Outcome.** Releases that verify themselves after deploy, secrets caught before merge, and errors that surface in Slack before a customer reports them.
+
+---
+
+## 6. Custom storefront engineering & data integrity
 
 **Problem.** The storefront needed configurable, validated product SKUs across many product lines, and order data needed to stay correct under real load.
 
@@ -142,4 +177,4 @@ flowchart LR
 
 ### Notes
 
-These summaries describe work I performed. Proprietary source code remains private to the company. Diagrams are illustrative, not exact internal topology.
+These summaries describe work I performed. Proprietary source code, credentials, customer data, pricing, and internal infrastructure details are intentionally omitted.
