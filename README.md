@@ -1,6 +1,6 @@
 # Work Casebook — Thomas Crowe
 
-Sanitized write-ups of production work I own as **Full-Stack Developer & Technical Operations Lead** at [CalibrationWands.com](https://calibrationwands.com) (a division of Fastec Services LLC). Architecture and outcomes only — no proprietary source, credentials, or internal infrastructure detail.
+Sanitized write-ups of production work I build and run as **Full-Stack Developer & Technical Operations Lead** at [CalibrationWands.com](https://calibrationwands.com) (a division of Fastec Services LLC). Architecture and outcomes only — no proprietary source, credentials, or internal infrastructure detail.
 
 > **Context.** CalibrationWands.com is a B2B e-commerce manufacturer of NIST-traceable calibration test standards, serving food, pharmaceutical, and textile quality-control customers. I build and operate its technical stack: storefront, infrastructure, internal platform, business-system integrations, and AI automation.
 
